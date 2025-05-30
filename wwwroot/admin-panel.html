@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <title>Admin панель | Кіберспортивна платформа</title>
+    <link rel="stylesheet" href="css/style.css">
+
+</head>
+<body>
+
+    <div id="header"></div>
+    <div class="container">
+        <h2>Адмін панель</h2>
+
+      
+        <div class="form-block">
+            <h3>Додати гру</h3>
+            <form id="addGameForm" enctype="multipart/form-data">
+                <label>Назва гри</label>
+                <input type="text" id="gname" required>
+                <label>Опис</label>
+                <textarea id="gdescription" rows="3"></textarea>
+                <label>Обкладинка (аватар)</label>
+                <input type="file" id="gphoto" accept="image/*">
+                <img id="gameAvatarPreview" class="avatar-preview" src="" style="display:none;" alt="Аватар">
+                <button type="submit">Додати гру</button>
+                <div class="msg" id="gameMsg"></div>
+            </form>
+        </div>
+
+        <div class="form-block">
+            <h3>Додати турнір</h3>
+            <form id="addTournamentForm">
+                <label>Гра</label>
+                <select id="gameSelect" required>
+                    <option value="">Обрати...</option>
+
+                </select>
+                <label>Назва турніра</label>
+                <input type="text" id="tname" required>
+                <label>Дата проведення</label>
+                <input type="date" id="tdate" required>
+                <label>Максимум команд</label>
+                <input type="number" id="maxTeams" min="2">
+                <label>Очків для перемоги</label>
+                <input type="number" id="pointsToWin" min="1">
+                <label>Гравців в команді</label>
+                <input type="number" id="playersInTeam" min="1">
+                <button type="submit">Додати турнір</button>
+                <div class="msg" id="tournamentMsg"></div>
+            </form>
+        </div>
+    </div>
+
+    <script src="/js/site.js"></script>
+    <script>
+      
+        document.getElementById('gphoto').onchange = function (e) {
+            const file = e.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = function (evt) {
+                document.getElementById('gameAvatarPreview').src = evt.target.result;
+                document.getElementById('gameAvatarPreview').style.display = "";
+            };
+            reader.readAsDataURL(file);
+        };
+
+        document.getElementById('addGameForm').onsubmit = async function (e) {
+            e.preventDefault();
+            let msg = document.getElementById("gameMsg");
+            msg.innerText = "";
+            const gname = document.getElementById("gname").value.trim();
+            const description = document.getElementById("gdescription").value.trim();
+            const photo = document.getElementById("gphoto").files[0];
+
+            if (!gname) {
+                msg.style.color = "#e74c3c";
+                msg.innerText = "Введіть назву гри";
+                return;
+            }
+
+            const form = new FormData();
+            form.append("Name", gname);
+            form.append("Description", description || "");
+            form.append("Photo", photo || new Blob([], { type: "application/octet-stream" }));
+
+            const res = await fetch("/api/game/add", {
+                method: "POST",
+                body: form,
+                headers: { "Authorization": "Bearer " + localStorage.getItem("jwtToken") }
+            });
+            const json = await res.json();
+            if (res.ok) {
+                msg.style.color = "lightgreen";
+                msg.innerText = json.message || "Гра додана!";
+                e.target.reset();
+                document.getElementById('gameAvatarPreview').style.display = "none";
+                loadGames();
+            } else {
+                msg.style.color = "#e74c3c";
+                msg.innerText = json.message || "Помилка додавання";
+            }
+        };
+
+  
+        async function loadGames() {
+            const select = document.getElementById("gameSelect");
+            select.innerHTML = '<option value="">Обрати...</option>';
+            try {
+                const res = await fetch("/api/game/details");
+                if (!res.ok) return;
+                const games = await res.json();
+                for (const g of games) {
+                    const option = document.createElement('option');
+                    option.value = g.id || g.gid || g.gname; // зависит от структуры данных
+                    option.textContent = g.gname;
+                    select.appendChild(option);
+                }
+            } catch (e) { /* ignore */ }
+        }
+        loadGames();
+
+     
+        document.getElementById('addTournamentForm').onsubmit = async function (e) {
+            e.preventDefault();
+            let msg = document.getElementById("tournamentMsg");
+            msg.innerText = "";
+
+            const gid = document.getElementById("gameSelect").value;
+            const name = document.getElementById("tname").value.trim();
+            const date = document.getElementById("tdate").value;
+            const maxTeams = document.getElementById("maxTeams").value;
+            const pointsToWin = document.getElementById("pointsToWin").value;
+            const playersInTeam = document.getElementById("playersInTeam").value;
+
+            if (!gid || !name || !date || !maxTeams || !pointsToWin || !playersInTeam) {
+                msg.style.color = "#e74c3c";
+                msg.innerText = "Заповніть усі обов'язкові поля!";
+                return;
+            }
+
+            const data = {
+                Gid: gid,
+                Name: name,
+                Date: date,
+                MaxTeams: maxTeams,
+                PointsToWin: pointsToWin,
+                PlayersInTeam: playersInTeam
+            };
+
+            const res = await fetch("/api/tournament", {
+                method: "POST",
+                headers: { "Content-Type": "application/json", "Authorization": "Bearer " + localStorage.getItem("jwtToken") },
+                body: JSON.stringify(data)
+            });
+            const json = await res.json();
+            if (res.ok) {
+                msg.style.color = "lightgreen";
+                msg.innerText = json.message || "Турнір додано!";
+                e.target.reset();
+            } else {
+                msg.style.color = "#e74c3c";
+                msg.innerText = json.message || "Помилка додавання";
+            }
+        };
+    </script>
+</body>
+</html>

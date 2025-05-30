@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Реєстрація | Кіберспортивна платформа</title>
+    <link rel="stylesheet" href="/css/rstyle.css">
+</head>
+<body>
+    <div class="container">
+        <h2>Реєстрація</h2>
+        <form id="registerForm" enctype="multipart/form-data">
+            <label>Email</label>
+            <input type="email" id="email" required>
+
+            <label>Пароль</label>
+            <input type="password" id="password" required>
+
+            <label>Нік гравця</label>
+            <input type="text" id="name" required>
+
+            <label>Стать</label>
+            <select id="sex" required>
+                <option value="">Обрати...</option>
+                <option value="М">Чоловіча</option>
+                <option value="Ж">Жіноча</option>
+            </select>
+
+            <label>Дата народження:</label>
+            <input type="date" id="dob" required>
+            <button type="submit">Зареєструватися</button>
+        </form>
+        <div class="msg" id="msg"></div>
+        <div style="margin-top:10px">
+            Вже маєте акаунт? <a href="/login.html" style="color:#2ecc40">Увійти</a>
+        </div>
+		<div style="margin-top:10px">
+			<a href="/index.html" style="color:#2ecc40">&larr; На головну</a>
+		</div>
+    </div>
+    <script>
+        document.getElementById("registerForm").onsubmit = async function(e) {
+            e.preventDefault();
+            let msg = document.getElementById("msg");
+            msg.innerText = "";
+
+
+            const email = document.getElementById("email").value.trim();
+            const password = document.getElementById("password").value.trim();
+            const name = document.getElementById("name").value.trim();
+            const sex = document.getElementById("sex").value;
+            const dob = document.getElementById("dob").value;
+
+            const data = {
+                email: email,
+                password: password,
+                name: name,
+                sex: sex,
+                dob: dob
+            };
+
+            const res = await fetch("/api/auth/register", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(data)
+            });
+            const json = await res.json();
+            if(res.ok) {
+                msg.style.color = "lightgreen";
+                msg.innerText = json.message || "Успішно!";
+                setTimeout(()=>window.location="/login.html", 1200);
+            } else {
+                msg.style.color = "#e74c3c";
+                msg.innerText = json.message || "Помилка реєстрації";
+            }
+        }
+    </script>
+</body>
+</html>

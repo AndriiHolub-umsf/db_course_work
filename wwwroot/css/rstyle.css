@@ -1,0 +1,49 @@
+body {
+    font-family: Arial;
+    background: #181C20;
+    color: #fff;
+}
+
+.container {
+    max-width: 400px;
+    margin: 100px auto;
+    padding: 30px;
+    background: #222;
+    border-radius: 8px;
+}
+
+label {
+    display: block;
+    margin-top: 10px;
+}
+
+input[type="text"],
+input[type="email"],
+input[type="password"],
+input[type="date"],
+select {
+    width: 100%;
+    padding: 8px;
+    margin-top: 5px;
+    border-radius: 4px;
+    border: none;
+    margin-bottom: 10px; /* добавим немного отступа после поля */
+    box-sizing: border-box;
+}
+
+button[type="submit"], button {
+    display: block;
+    width: 100%;
+    margin-top: 20px;
+    padding: 12px 0;
+    border-radius: 5px;
+    background: #2ecc40;
+    color: #fff;
+    border: none;
+    font-size: 16px;
+    cursor: pointer;
+}
+
+.msg {
+    margin-top: 15px;
+}

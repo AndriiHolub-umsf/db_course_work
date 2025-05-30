@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <title>Создать команду | Кіберспортивна платформа</title>
+    <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+<div id="header"></div>
+<div class="container">
+    <h2>Створення нової команди</h2>
+    <form id="createTeamForm" enctype="multipart/form-data">
+        <label for="tname">Назва команди</label>
+        <input type="text" id="tname" name="tname" required maxlength="100">
+
+        <label for="photo">Аватар команди</label>
+        <input type="file" id="photo" name="photo" accept="image/*">
+        <img id="avatarPreview" class="avatar-preview" src="" style="display:none;" alt="Аватар">
+
+        <button type="submit">Створити команду</button>
+        <div id="msg" class="msg"></div>
+    </form>
+    <div style="margin-top:10px;">
+        <a href="/teams.html" style="color:#2ecc40">&larr; До списку команд</a>
+    </div>
+</div>
+
+<script src="/js/site.js"></script>
+<script>
+
+
+    // Превью аватара
+    document.getElementById('photo').onchange = function(e) {
+        const file = e.target.files[0];
+        const preview = document.getElementById('avatarPreview');
+        if (file) {
+            const reader = new FileReader();
+            reader.onload = function(evt) {
+                preview.src = evt.target.result;
+                preview.style.display = "";
+            };
+            reader.readAsDataURL(file);
+        } else {
+            preview.style.display = "none";
+            preview.src = "";
+        }
+    };
+
+    document.getElementById('createTeamForm').onsubmit = async function(e) {
+        e.preventDefault();
+        let msg = document.getElementById('msg');
+        msg.innerText = "";
+
+        const tname = document.getElementById('tname').value.trim();
+        const photoInput = document.getElementById('photo');
+        const photo = photoInput.files[0];
+
+        if (!tname) {
+            msg.innerText = "Введіть назву команди!";
+            msg.style.color = "#e74c3c";
+            return;
+        }
+
+        const form = new FormData();
+        form.append("Name", tname);
+        form.append("Photo", photo || new Blob([], { type: "application/octet-stream" }));
+
+        const res = await fetch("/api/team/add", {
+            method: "POST",
+            body: form,
+            headers: {
+                "Authorization": "Bearer " + localStorage.getItem("jwtToken"),
+            }
+        });
+
+        const json = await res.json();
+        if (res.ok) {
+            msg.style.color = "lightgreen";
+            msg.innerText = json.message || "Команда створена!";
+            setTimeout(() => window.location = "/teams.html", 1200);
+        } else {
+            msg.style.color = "#e74c3c";
+            msg.innerText = json.message || "Помилка створеня";
+        }
+    };
+
+</script>
+</body>
+</html>

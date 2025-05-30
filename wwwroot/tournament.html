@@ -1,0 +1,391 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <title>Турнірна сітка</title>
+    <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+    <div id="header"></div>
+    <div class="container-tournament" id="tournamentInfo"></div>
+    <script src="/js/site.js"></script>
+    <script>
+        function getTournamentId() {
+            const params = new URLSearchParams(window.location.search);
+            return params.get('id');
+        }
+        async function getUserInfo() {
+
+            const jwt = localStorage.getItem("jwtToken");
+            return jwt ? JSON.parse(atob(jwt.split('.')[1])) : {};
+        }
+
+        async function setupApplicationUI(tournamentId) {
+            const container = document.getElementById('applyContainer');
+
+            if (!container) return;
+ 
+
+            const select = document.getElementById('teamSelect');
+            const btn = document.getElementById('applyBtn');
+            const msg = document.getElementById('applyMsg');
+            container.style.display = "none";
+            select.innerHTML = '';
+            msg.innerText = '';
+
+            let res = await fetch('/api/team/my-captain', {
+                headers: { "Authorization": "Bearer " + localStorage.getItem("jwtToken") }
+            });
+            if (!res.ok)
+                return; 
+
+            let teams = await res.json();
+            if (!teams.length) return;
+
+            select.innerHTML = '';
+            for (const t of teams) {
+                select.innerHTML += `<option value="${t.id}">${t.tname}</option>`;
+            }
+            container.style.display = "";
+
+            btn.onclick = async function () {
+                btn.disabled = true;
+                msg.innerText = '';
+                let teamId = select.value;
+                try {
+                    let res = await fetch(`/api/tournament/${tournamentId}/submit_an_app`, {
+                        method: "POST",
+                        headers: {
+                            "Authorization": "Bearer " + localStorage.getItem("jwtToken"),
+                            "Content-Type": "application/json"
+                        },
+                        body: JSON.stringify({ teamId: teamId })
+                    });
+                    let json = await res.json();
+                    if (res.ok) {
+                        msg.style.color = "#2ecc40";
+                        msg.innerText = "Заявку надіслано!";
+                        setTimeout(() => msg.innerText = '', 2000);
+                    } else {
+                        msg.style.color = "#e74c3c";
+                        msg.innerText = json.message || "Помилка відправлення";
+                    }
+                } catch (e) {
+                    msg.style.color = "#e74c3c";
+                    msg.innerText = "Помилка";
+                }
+                btn.disabled = false;
+            }
+        }
+
+        async function changeScore(matchId, team, delta) {
+            let tid = getTournamentId();
+            await fetch(`/api/tournament/${tid}/match/${matchId}/score`, {
+                method: "PATCH",
+                headers: { "Authorization": "Bearer " + localStorage.getItem("jwtToken"), "Content-Type": "application/json" },
+                body: JSON.stringify({ team: team, change: delta })
+            });
+            await loadTournament();
+        }
+
+        async function finishMatch(matchId) {
+            if (!confirm("Ви впевнені, що хочете завершити матч?")) return;
+            let tid = getTournamentId();
+            await fetch(`/api/tournament/${tid}/match/${matchId}/finish`, {
+                method: "POST",
+                headers: { "Authorization": "Bearer " + localStorage.getItem("jwtToken") }
+            });
+            await loadTournament();
+        }
+
+        async function deleteMatch(matchId) {
+            if (!confirm("Видалити цей матч?")) return;
+            let tid = getTournamentId();
+            await fetch(`/api/tournament/${tid}/match/${matchId}`, {
+                method: "DELETE",
+                headers: { "Authorization": "Bearer " + localStorage.getItem("jwtToken") }
+            });
+            await loadTournament();
+        }
+
+        async function loadTournament() {
+            let id = getTournamentId();
+            let container = document.getElementById('tournamentInfo');
+            container.innerHTML = 'Завантаження...';
+            try {
+                let res = await fetch(`/api/tournament/${id}/info`, {
+                    headers: { "Authorization": "Bearer " + localStorage.getItem("jwtToken") }
+                });
+                if (!res.ok) throw new Error("Помилка завантаження турніра");
+                let t = await res.json();
+
+
+                let gamePhoto = t.gamePhotoBase64
+                    ? `<img src="data:image/jpeg;base64,${t.gamePhotoBase64}" alt="game" style="width:80px;vertical-align:middle;border-radius:16px;margin-right:12px;">`
+                    : '';
+
+                let statusHtml = t.started
+                    ? `<span class="status-green">Турнір почався</span>`
+                    : `<span class="status-grey">Очікує початку</span>`;
+                if (t.winnerId)
+                    statusHtml = `<span class="status-blue">Турнір завершено</span>`;
+
+                let info = `
+                     <div class="tournament-info-block">
+                    <h2>Турнір: ${t.name}</h2>
+                    <div class="tournament-meta">
+                    <b>Гра:</b> ${gamePhoto}<span style="font-size:18px;vertical-align:middle">${t.gameName}</span><br>
+                    <b>Дата:</b> ${t.date.split('T')[0]}<br>
+                    <b>Макс. команд:</b> ${t.maxTeams}, <b>Потрібно гравців у команді:</b> ${t.playersInTeam}<br>
+                    <b>Очок для перемоги:</b> ${t.pointsToWin}<br>
+                    <b>Статус:</b> ${statusHtml}<br>
+                    <b>Прийнято команд:</b> ${t.approvedCount}/${t.maxTeams}
+                    </div>`;
+
+                // Кнопка заявки (если капитан)
+                let myBlock = "";
+                if (t.myRequest) {
+                    if (t.myRequest.status === "pending")
+                        myBlock = `<div style="color:#888;margin:8px 0 0;">Ви подали заявку (очікує на розгляд)</div>`;
+                    else if (t.myRequest.status === "approved")
+                        myBlock = `<div style="color:#2ecc40;margin:8px 0 0;">Ваша команда бере участь</div>`;
+                    else if (t.myRequest.status === "rejected")
+                        myBlock = `<div style="color:#e74c3c;margin:8px 0 0;">Заявка відхилена</div>`;
+                } else if (!t.started && t.approvedCount < t.maxTeams) {
+                    // Можно подать заявку (добавить выбор своей команды, если их несколько)
+                    myBlock = `<div id="applyContainer" style="margin:16px 0; display:none;">
+                                 <select id="teamSelect" style="padding:7px 12px; font-size:15px; border-radius:5px; margin-right:12px;"></select>
+                                  <button id="applyBtn" style="padding:7px 18px; background:#2ecc40; color:#fff; border:none; border-radius:6px; cursor:pointer;">Подати заявку</button>
+                                    <span id="applyMsg" style="margin-left:10px;"></span>
+                                </div>`;
+                }
+
+
+                const user = await getUserInfo();
+                isAdmin = user[roleClaim] === "Admin";
+
+                let requestsBlock = "";
+                let adminControls = "";
+                let setWinnerBlock = "";
+                if (isAdmin) {
+
+                    let options = "";
+                    if (t.requests) {
+                        let approved = t.requests.filter(r => r.status === "approved");
+                        for (const r of approved) {
+                            options += `<option value="${r.teamId}">${r.teamName}</option>`;
+                        }
+                    }
+                    if (!t.winnerId) {
+      
+
+                        adminControls = `<div class="match-controls">
+                         <b>Створити матч:</b><br>
+                         <select id="teamASelect">${options}</select>
+                        <span>VS</span>
+                        <select id="teamBSelect">${options}</select>
+                        <input type="number" id="roundInput" min="1" value="1" style="width:55px;" />
+                        <button id="createMatchBtn" class="btn-success">Створити матч</button>
+                        </div>
+                        <button id="deleteTournamentBtn" class="btn-danger" style="margin-top:8px;">Видалити турнір</button>
+                        <div id="adminMsg" style="margin-top:8px;"></div>`;
+
+                        if (t.requests && t.requests.length) {
+
+                            requestsBlock = `<h3>Заявки:</h3><table><tr><th>Команда</th><th>Капітан</th><th>Email</th><th>Статус</th><th></th></tr>`;
+                            for (const r of t.requests) {
+                                requestsBlock += `<tr>
+                            <td>${r.teamName}</td>
+                           <td>${r.captainName}</td>
+                           <td>${r.captainEmail}</td>
+                           <td>${r.status}</td>
+                           <td>
+                           ${r.status === "pending"
+                                        ? `<button class="approveBtn" data-tid="${t.id}" data-team="${r.teamId}" style="color:#fff;background:#2ecc40;padding:5px 12px;border:none;border-radius:4px;margin-right:5px;">Схвалити</button>
+                           <button class="rejectBtn" data-tid="${t.id}" data-team="${r.teamId}" style="color:#fff;background:#e74c3c;padding:5px 12px;border:none;border-radius:4px;">Відхилити</button>`
+                                        : ""}
+                           </td>
+                           </tr>`;
+                            }
+                            requestsBlock += "</table>";
+
+
+                        }
+                    }
+
+                    setWinnerBlock = `
+                        <div style="margin:24px 0 8px;">
+                            <b>Завершити турнір та вибрати переможця:</b>
+                            <select id="winnerSelect">
+                                ${options}
+                            </select>
+                            <td></td>
+                        <button id="setWinnerBtn" class="btn-success">Задати переможця</button>
+                         <span id="winnerMsg" style="margin-left:10px;"></span>
+                        </div>`;
+                        
+                }
+
+                let matchesBlock = "";
+                if (t.matches && t.matches.length) {
+                    matchesBlock = `<h3>Матчи</h3>
+                                    <table class="match-table">
+                                    <tr>
+                                    <th>Раунд</th>
+                                    <th>Команда A</th>
+                                    <th>Рахунок</th>
+                                    <th>Команда B</th>
+                                    <th></th>
+                                    </tr>`;
+                    for (const m of t.matches) {
+                        let winA = m.winnerId === m.team_a_id, winB = m.winnerId === m.team_b_id;
+
+                        matchesBlock += `<tr class="match-back">
+                            <td>${m.round}</td>
+                             <td class="${winA ? 'score-winner' : ''}">${m.teamA}</td>
+                            <td>
+                             ${(isAdmin && !t.winnerId)? `
+                             <button class="score-btn" onclick="changeScore(${m.id},0,1)">+</button>
+                             <button class="score-btn" onclick="changeScore(${m.id},0,-1)">-</button>
+                            <span style = "font-size:22px" > ${ m.scoreA ?? 0} : ${m.scoreB ?? 0 }</span >
+                             <button class="score-btn" onclick="changeScore(${m.id},1,1)">+</button>
+                             <button class="score-btn" onclick="changeScore(${m.id},1,-1)">-</button>
+
+                             ` : `<span style="font-size:22px">${m.scoreA ?? 0} : ${m.scoreB ?? 0}</span>`
+                            }
+                             </td>
+                             <td class="${winB ? 'score-winner' : ''}">${m.teamB}</td>
+                             <td>
+                             ${(isAdmin && !m.winnerId && !t.winnerId && ((m.scoreA >= t.pointsToWin || m.scoreB >= t.pointsToWin))
+                                ? `<button class="btn-finish" onclick="finishMatch(${m.id})">Завершити</button>`
+                                : "")}
+                             ${isAdmin ? `<button class="btn-delete" onclick="deleteMatch(${m.id})">Видатили</button>` : ""}
+                             </td>
+                             </tr>`;
+                    }
+                    matchesBlock += "</table>";
+                }
+
+                let winnerBlock = '';
+                if (t.winnerId && t.winnerName) {
+                    winnerBlock = `<div class="tournament-winner" style="margin:24px 0 8px;">
+                                    <span style="color:#ffd700;font-size:20px;font-weight:bold;">🏆 Переможець турніру: ${t.winnerName}</span>
+                                    </div>`;
+                }
+
+                container.innerHTML = info + myBlock + winnerBlock + adminControls + requestsBlock + setWinnerBlock + matchesBlock;
+
+
+                setupApplicationUI(id);
+
+
+                if (isAdmin) {
+
+
+                    document.getElementById('setWinnerBtn').onclick = async function () {
+                        let winnerId = document.getElementById('winnerSelect').value;
+                        let msg = document.getElementById('winnerMsg');
+                        msg.innerText = '';
+                        this.disabled = true;
+                        try {
+                            let res = await fetch(`/api/tournament/${id}/set_winner`, {
+                                method: "POST",
+                                headers: {
+                                    "Authorization": "Bearer " + localStorage.getItem("jwtToken"),
+                                    "Content-Type": "application/json"
+                                },
+                                body: JSON.stringify({ teamId: winnerId })
+                            });
+                            let json = await res.json();
+                            if (res.ok) {
+                                msg.style.color = "#2ecc40";
+                                msg.innerText = "Переможця встановлено!";
+                                setTimeout(loadTournament, 1000);
+                            } else {
+                                msg.style.color = "#e74c3c";
+                                msg.innerText = json.message || "Помилка";
+                            }
+                        } catch (e) {
+                            msg.style.color = "#e74c3c";
+                            msg.innerText = "Помилка";
+                        }
+                        this.disabled = false;
+                    };
+                    if (!t.winnerId) {
+
+                        document.querySelectorAll('.approveBtn').forEach(btn => {
+                            btn.onclick = async function () {
+                                let tid = btn.getAttribute('data-tid');
+                                let teamId = btn.getAttribute('data-team');
+                                btn.disabled = true;
+                                let res = await fetch(`/api/tournament/${tid}/team/${teamId}/approve`, {
+                                    method: "POST",
+                                    headers: { "Authorization": "Bearer " + localStorage.getItem("jwtToken") }
+                                });
+                                await loadTournament();
+                            };
+                        });
+                        document.querySelectorAll('.rejectBtn').forEach(btn => {
+                            btn.onclick = async function () {
+                                let tid = btn.getAttribute('data-tid');
+                                let teamId = btn.getAttribute('data-team');
+                                btn.disabled = true;
+                                let res = await fetch(`/api/tournament/${tid}/team/${teamId}/reject`, {
+                                    method: "POST",
+                                    headers: { "Authorization": "Bearer " + localStorage.getItem("jwtToken") }
+                                });
+                                await loadTournament();
+                            };
+                        });
+
+                        document.getElementById('createMatchBtn').onclick = async function () {
+                            let tid = id;
+                            let teamA = document.getElementById('teamASelect').value;
+                            let teamB = document.getElementById('teamBSelect').value;
+                            let round = document.getElementById('roundInput').value;
+                            let adminMsg = document.getElementById('adminMsg');
+                            if (teamA === teamB) {
+                                adminMsg.innerText = "Виберіть різні команди!";
+                                adminMsg.style.color = "#e74c3c";
+                                return;
+                            }
+                            adminMsg.innerText = "Створення...";
+                            let res = await fetch(`/api/tournament/${tid}/match/create`, {
+                                method: "POST",
+                                headers: {
+                                    "Authorization": "Bearer " + localStorage.getItem("jwtToken"),
+                                    "Content-Type": "application/json"
+                                },
+                                body: JSON.stringify({ teamAId: teamA, teamBId: teamB, round: round })
+                            });
+                            let json = await res.json();
+                            if (res.ok) {
+                                adminMsg.style.color = "#2ecc40";
+                                adminMsg.innerText = "Матч створенно!";
+                                setTimeout(loadTournament, 500);
+                            } else {
+                                adminMsg.style.color = "#e74c3c";
+                                adminMsg.innerText = json.message || "Помилка";
+                            }
+                        };
+
+                        document.getElementById('deleteTournamentBtn').onclick = async function () {
+                            if (!confirm("Видалити турнір?")) return;
+                            let res = await fetch(`/api/tournament/${id}`, {
+                                method: "DELETE",
+                                headers: { "Authorization": "Bearer " + localStorage.getItem("jwtToken") }
+                            });
+                            if (res.ok) location.href = "/tournaments.html";
+                            else alert("Помилка видалення");
+                        }
+                    }
+                }
+
+            } catch (e) {
+                container.innerHTML = `<div style="color:#e74c3c">Помилка: ${e.message}</div>`;
+            }
+        }
+        loadTournament();
+    </script>
+</body>
+</html>

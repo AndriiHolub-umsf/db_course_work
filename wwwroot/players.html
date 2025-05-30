@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+
+<html lang="ru">
+<head>
+<meta charset="utf-8"/>
+<title>Кіберспортивна платформа</title>
+<link href="/css/style.css" rel="stylesheet"/>
+</head>
+<body>
+<div id="header"></div>
+<div class="container">
+<h2>Гравці</h2>
+<table id="playersTable">
+<thead>
+<tr>
+<th>Фото</th>
+<th>Нік</th>
+<th>Дата народження</th>
+<th>Стать</th>
+</tr>
+</thead>
+<tbody>
+<tr><td colspan="6" style="text-align:center;">Завантаження...</td></tr>
+</tbody>
+</table>
+<div id="msg" style="color:#e74c3c;margin-top:10px;"></div>
+</div>
+<script src="/js/site.js"></script>
+<script>
+        async function loadPlayers() {
+            let tbody = document.querySelector("#playersTable tbody");
+            tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;">Завантаження...</td></tr>';
+            let msg = document.getElementById('msg');
+            msg.innerText = "";
+
+            try {
+                const res = await fetch("/api/player/all");
+                if (!res.ok) throw new Error("Помилка завантаження гравців");
+                const players = await res.json();
+                if (!players.length) {
+                    tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;">Нема гравців</td></tr>';
+                    return;
+                }
+                tbody.innerHTML = "";
+                for (const p of players) {
+                    let photo = p.photoBase64
+                        ? `<img class="avatar-preview" src="data:image/jpeg;base64,${p.photoBase64}" alt="Фото">`
+                        : `<span style="color:#666">Нема</span>`;
+                    tbody.innerHTML += `<tr onclick="window.location='/player.html?id=${p.pid}'" style="cursor:pointer">
+                                <td>${photo}</td>
+                                <td>${p.pname ?? '-'}</td>
+                                <td>${p.dob ?? '-'}</td>
+                                <td>${p.sex ?? '-'}</td>
+                            </tr>`;
+                }
+            } catch (e) {
+                msg.innerText = e.message || "Помилка";
+                tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;">Помилка завантаження</td></tr>';
+            }
+        }
+
+        loadPlayers();
+    </script>
+</body>
+</html>

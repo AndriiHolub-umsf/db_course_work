@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+
+<html lang="ru">
+<head>
+<meta charset="utf-8"/>
+<title>Кіберспортивна платформа</title>
+<link href="css/style.css" rel="stylesheet"/>
+</head>
+<body>
+<div id="header"></div>
+<div class="container">
+<h2>Команди</h2>
+<div id="createTeamContainer" style="margin-bottom:20px; display:none;">
+<button id="createTeamBtn" style="background:#2ecc40;color:#fff;padding:10px 24px;font-size:16px;border:none;border-radius:6px;cursor:pointer;">
+                Створити команду
+            </button>
+</div>
+<table id="teamsTable">
+<thead>
+<tr>
+<th>Фото</th>
+<th>Назва</th>
+<th>Капітан</th>
+</tr>
+</thead>
+<tbody>
+<tr><td colspan="5" style="text-align:center;">Завантаження...</td></tr>
+</tbody>
+</table>
+<div id="msg" style="color:#e74c3c;margin-top:10px;"></div>
+</div>
+<script src="/js/site.js"></script>
+<script>
+
+        async function checkPlayerInTeam() {
+            try {
+
+                document.getElementById("createTeamContainer").style.display = "";
+                document.getElementById("createTeamBtn").onclick = function () {
+                    window.location = "/create-team.html";
+                }
+                /*const res = await fetch('/api/player/in_team', {
+                    headers: { "Authorization": "Bearer " + localStorage.getItem("jwtToken") }
+                });
+                if (!res.ok)
+                    return;
+                const { inTeam } = await res.json();
+                if (!inTeam) {
+                    document.getElementById("createTeamContainer").style.display = "";
+                    document.getElementById("createTeamBtn").onclick = function () {
+                        window.location = "/create-team.html";
+                    }
+                }*/
+            } catch (e) {
+
+            }
+        }
+
+
+        async function loadTeams() {
+            let tbody = document.querySelector("#teamsTable tbody");
+            tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;">Завантаження...</td></tr>';
+            let msg = document.getElementById('msg');
+            msg.innerText = "";
+
+            try {
+                const res = await fetch("/api/team/details");
+                if (!res.ok) throw new Error("Помилка завантаження команд");
+                const teams = await res.json();
+                if (!teams.length) {
+                    tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;">Немає команд</td></tr>';
+                    return;
+                }
+                tbody.innerHTML = "";
+                for (const t of teams) {
+                    let photo = t.photoBase64
+                        ? `<img class="team-photo-avatar" src="data:image/jpeg;base64,${t.photoBase64}" alt="Фото">`
+                        : `<span style="color:#666">Нет</span>`;
+                    tbody.innerHTML += `<tr onclick="window.location='/team.html?id=${t.id}'" style="cursor:pointer">
+                            <td>${photo}</td>
+                            <td>${t.tname}</td>
+                            <td>${t.captain_Name ?? '-'}</td>
+                        </tr>`;
+                }
+            } catch (e) {
+                msg.innerText = e.message || "Помилка";
+                tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;">Помилка завантаження</td></tr>';
+            }
+        }
+
+
+        checkPlayerInTeam();
+        loadTeams();
+    </script>
+</body>
+</html>

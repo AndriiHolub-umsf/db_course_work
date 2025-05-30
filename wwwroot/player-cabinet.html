@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="ru">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Редактирование игрока | Кіберспортивна платформа</title>
+    <link rel="stylesheet" href="css/style.css">
+
+</head>
+<body>
+
+    <div id="header"></div>
+    <div class="container">
+        <div class="form-block">
+            <h2>Редагування профілю</h2>
+            <h3>Зміна пароля</h3>
+            <form id="changePasswordForm">
+                <label for="oldpassword">Старий пароль</label>
+                <input type="password" id="oldpassword" autocomplete="current-password" required>
+
+                <label for="newpassword">Новий пароль</label>
+                <input type="password" id="newpassword" autocomplete="new-password" required>
+
+                <label for="confirmpassword">Підтвердження нового пароляя</label>
+                <input type="password" id="confirmpassword" autocomplete="new-password" required>
+
+                <button type="submit">Змінити пароль</button>
+                <div class="msg" id="msg-changepsw"></div>
+            </form>
+        </div>
+
+        <div class="form-block">
+            <form id="editPlayerForm" enctype="multipart/form-data">
+                <label for="name">Nick гравця</label>
+                <input type="text" id="name" required>
+
+                <label for="sex">Пол</label>
+                <select id="sex" required>
+                    <option value="">Обрати...</option>
+                    <option value="М">Чоловіча</option>
+                    <option value="Ж">Жіноча</option>
+                </select>
+
+                <label for="dob">Дата народження</label>
+                <input type="date" id="dob" required>
+
+                <label for="photo">Фото гравця:</label>
+
+                <img id="avatarPreview" class="avatar-preview" src="" style="display:none;" alt="Аватар">
+
+                <input type="file" id="photo" accept="image/*">
+                <button type="submit">Зберегти</button>
+                <div class="msg" id="msg"></div>
+            </form>
+        </div>
+    </div>
+
+    <script src="/js/site.js"></script>
+    <script>
+        let currentPlayerId = null;
+
+        function parseToDateInput(str) {
+            if (!str) return "";
+            let match = str.match(/^(\d{2})\/(\d{2})\/(\d{4})/);
+            if (match) {
+             
+                return `${match[3]}-${match[1]}-${match[2]}`;
+            }
+            return "";
+        }
+
+        async function loadPlayerData() {
+            const res = await fetch('/api/auth/myinfo', {
+                headers: { "Authorization": "Bearer " + localStorage.getItem("jwtToken") }
+            });
+            if (!res.ok) return;
+            const p = await res.json();
+
+            dobString = parseToDateInput(p.dob);
+
+            document.getElementById('name').value = p.pname || "";
+            document.getElementById('sex').value = p.sex || "";
+            document.getElementById('dob').value = dobString;
+
+            if (p.photoBase64) {
+                const avatar = document.getElementById('avatarPreview');
+                avatar.src = "data:image/jpeg;base64," + p.photoBase64;
+                avatar.style.display = "";
+            }
+        }
+
+        document.getElementById('photo').onchange = function (e) {
+            const file = e.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = function (evt) {
+                document.getElementById('avatarPreview').src = evt.target.result;
+                document.getElementById('avatarPreview').style.display = "";
+            };
+            reader.readAsDataURL(file);
+        };
+
+
+        document.getElementById("changePasswordForm").onsubmit = async function (e) {
+            e.preventDefault();
+            let msg = document.getElementById("msg-changepsw");
+            msg.innerText = "";
+            const oldpassword = document.getElementById("oldpassword").value;
+            const newpassword = document.getElementById("newpassword").value;
+            const confirmpassword = document.getElementById("confirmpassword").value;
+
+            if (!oldpassword || !newpassword || !confirmpassword) {
+                msg.style.color = "#e74c3c";
+                msg.innerText = "Заповніть усі поля";
+                return;
+            }
+            if (newpassword !== confirmpassword) {
+                msg.style.color = "#e74c3c";
+                msg.innerText = "Нові паролі не збігаються!";
+                return;
+            }
+            if (newpassword.length < 6) {
+                msg.style.color = "#e74c3c";
+                msg.innerText = "Пароль надто короткий!!";
+                return;
+            }
+
+            const data = {
+                oldPassword: oldpassword,
+                newPassword: newpassword
+            };
+
+            const res = await fetch("/api/auth/changepsw", {
+                method: "POST",
+                headers: { "Content-Type": "application/json", "Authorization": "Bearer " + localStorage.getItem("jwtToken") },
+                body: JSON.stringify(data)
+            });
+            const json = await res.json();
+            if (res.ok) {
+                msg.style.color = "lightgreen";
+                msg.innerText = json.message || "Пароль успішно змінено!";
+                document.getElementById("changePasswordForm").reset();
+            } else {
+                msg.style.color = "#e74c3c";
+                msg.innerText = json.message || "Помилка зміни пароля";
+            }
+        };
+
+        document.getElementById('editPlayerForm').onsubmit = async function (e) {
+            e.preventDefault();
+            let msg = document.getElementById("msg");
+            msg.innerText = "";
+
+
+            const name = document.getElementById("name").value.trim();
+            const sex = document.getElementById("sex").value;
+            const dob = document.getElementById("dob").value;
+
+
+            const photoInput = document.getElementById("photo");
+            const photo = photoInput.files[0];
+
+         
+            if (!name || !sex || !dob) {
+                msg.style.color = "#e74c3c";
+                msg.innerText = "Будь ласка, заповніть усі обов'язкові поля!";
+                return;
+            }
+
+            const form = new FormData();
+            form.append("Name", name);
+            form.append("Sex", sex);
+            form.append("Dob", dob);
+
+
+
+
+            form.append("Photo", photo || new Blob([], { type: "application/octet-stream" }));
+
+
+
+            const res = await fetch("/api/auth/myinfo/update", {
+                method: "POST",
+                body: form,
+                headers: {
+                    "Authorization": "Bearer " + localStorage.getItem("jwtToken"),
+                }
+            });
+
+            const json = await res.json();
+            if (res.ok) {
+                msg.style.color = "lightgreen";
+                msg.innerText = json.message || "Зміни збережено!";
+            } else {
+                msg.style.color = "#e74c3c";
+                msg.innerText = json.message || "Помилка збереження";
+            }
+        };
+
+        loadPlayerData();
+    </script>
+</body>
+</html>

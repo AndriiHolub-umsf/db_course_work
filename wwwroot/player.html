@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <title>Профіль гравця</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <div id="header"></div>
+    <div class="container" id="playerProfile">
+        <h2>Завантаження профілю...</h2>
+    </div>
+    <script src="/js/site.js"></script>
+    <script>
+        function getPlayerId() {
+            const params = new URLSearchParams(window.location.search);
+            return params.get('id');
+        }
+
+        async function loadPlayerProfile() {
+            const id = getPlayerId();
+            if (!id) return;
+            const container = document.getElementById('playerProfile');
+            container.innerHTML = '<h2>Завантаження профілю...</h2>';
+            try {
+          
+                const res = await fetch(`/api/player/details/${id}`);
+                if (!res.ok)
+                    throw new Error("Помилка завантаження профілю");
+                const p = await res.json();
+
+      
+                let photoHtml = p.photoBase64
+                    ? `<img class="profile-avatar" src="data:image/jpeg;base64,${p.photoBase64}" alt="Фото">`
+                    : `<div class="profile-avatar" style="background:#444;display:flex;align-items:center;justify-content:center;color:#999;">Немає фото</div>`;
+
+   
+                let nickHtml = `<span class="profile-nick">${p.pname ?? '-'}</span>`;
+
+
+                let sexDob = [];
+                if (p.sex) sexDob.push((p.sex === "М" ? "Чоловіча" : "Жіноча"));
+                if (p.dob) sexDob.push("Дата народження: " + toLocaleDate(p.dob));
+                let extraHtml = sexDob.length ? `<div style="color:#bbb;margin:4px 0 8px 0;">${sexDob.join(" | ")}</div>` : "";
+
+      
+                let teamsHtml = (p.teams && p.teams.length)
+                    ? `<ul class="teams-list">` + p.teams.map(t =>
+                        `<li><a href="/team.html?id=${t.id}">${t.name}</a>${id === t.captain_id ? ' <span style="color:#2ecc40;font-weight:bold;">(Капітан)</span>' : ''}</li>`
+                    ).join('') + `</ul>`
+                    : '<div style="color:#888;">Немає команд</div>';
+
+        
+                let tournamentsHtml = (p.tournaments && p.tournaments.length)
+                    ? `<ul class="tournaments-list">` + p.tournaments.map(tr =>
+                        `<li>${tr.name} (${toLocaleDate(tr.date) ?? '-'})</li>`
+                    ).join('') + `</ul>`
+                    : '<div style="color:#888;">Немає турнірів</div>';
+
+              
+                container.innerHTML = `
+                    <div class="profile-block">
+                        <div class="profile-header">
+                            ${photoHtml}
+                            <div>
+                                ${nickHtml}
+                                ${extraHtml}
+                            </div>
+                        </div>
+                    </div>
+                    <div class="profile-block">
+                        <h3>Команды:</h3>
+                        ${teamsHtml}
+                    </div>
+                    <div class="profile-block">
+                        <h3>Турниры:</h3>
+                        ${tournamentsHtml}
+                    </div>
+                `;
+            } catch (e) {
+                container.innerHTML = `<div style="color:#e74c3c">Помилка: ${e.message}</div>`;
+            }
+        }
+
+        loadPlayerProfile();
+    </script>
+</body>
+</html>

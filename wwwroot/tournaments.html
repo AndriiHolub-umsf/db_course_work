@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+
+<html lang="ru">
+<head>
+<meta charset="utf-8"/>
+<title>Кіберспортивна платформа</title>
+<link href="css/style.css" rel="stylesheet"/>
+</head>
+<body>
+<div id="header"></div>
+<div class="container">
+<h2>Турніри</h2>
+<table id="tournamentsTable">
+<thead>
+<tr>
+<th></th>
+<th>Назва</th>
+<th>Гра</th>
+<th>Дата</th>
+<th>Кількість команд</th>
+<th>Очків для перемоги</th>
+<th>Гравців в команді</th>
+</tr>
+</thead>
+<tbody>
+<tr><td colspan="7" style="text-align:center;">Завантаження...</td></tr>
+</tbody>
+</table>
+<div id="msg" style="color:#e74c3c;margin-top:10px;"></div>
+</div>
+<script src="js/site.js"></script>
+<script>
+
+        async function loadTournaments() {
+            let tbody = document.querySelector("#tournamentsTable tbody");
+            tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;">Завантаження...</td></tr>';
+            let msg = document.getElementById('msg');
+            msg.innerText = "";
+
+            try {
+                const res = await fetch("/api/tournament");
+                if (!res.ok) throw new Error("Помилка завантаження турніров");
+                const tournaments = await res.json();
+                if (!tournaments.length) {
+                    tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;">Нема турніров</td></tr>';
+                    return;
+                }
+                tbody.innerHTML = "";
+                for (const t of tournaments) {
+                    let photo = t.gamePhotoBase64
+                        ? `<img class="game-photo-avatar" src="data:image/jpeg;base64,${t.gamePhotoBase64}" alt="Фото">`
+                        : `<span style="color:#666">Нема</span>`;
+                    tbody.innerHTML += `<tr onclick="window.location='/tournament.html?id=${t.id}'" style="cursor:pointer">
+                            <td>${photo}</td>
+                            <td>${t.name}</td>
+                            <td>${t.gname ?? '-'}</td>
+                            <td>${toLocaleDate(t.date) ?? '-'}</td>
+                            <td>${t.max_teams ?? '-'}</td>
+                            <td>${t.points_to_win ?? '-'}</td>
+                            <td>${t.players_in_team ?? '-'}</td>
+                        </tr>`;
+                }
+            } catch (e) {
+                msg.innerText = e.message || "Помилка";
+                tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;">Помилка завантаження</td></tr>';
+            }
+        }
+
+        loadTournaments();
+    </script>
+</body>
+</html>

@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <title>Кіберспортивна платформа</title>
+    <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+    <div id="header"></div>
+
+    <div class="container">
+        <h2 class="calendar-title">Календар турнірів</h2>
+        <table id="tournamentsTable">
+            <thead>
+                <tr>
+                    <th>Назва</th>
+                    <th>Дата</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr><td colspan="2" style="text-align:center;">Завантаження...</td></tr>
+            </tbody>
+        </table>
+        <div class="msg" id="msg"></div>
+    </div>
+
+    <script src="/js/site.js"></script>
+    
+    <script>
+
+        async function loadTournaments() {
+            let msg = document.getElementById("msg");
+            msg.innerText = "";
+            let tbody = document.querySelector("#tournamentsTable tbody");
+            tbody.innerHTML = '<tr><td colspan="2" style="text-align:center;">Завантаження...</td></tr>';
+
+            try {
+                const res = await fetch("/api/tournament");
+                if (!res.ok) throw new Error("Помилка завантаження турнірів");
+                const tournaments = await res.json();
+
+                if (!tournaments.length) {
+                    tbody.innerHTML = '<tr><td colspan="2" style="text-align:center;">Нема турнірів</td></tr>';
+                    return;
+                }
+                tbody.innerHTML = "";
+                for (const t of tournaments) {
+                    tbody.innerHTML += `<tr>
+                                    <td>${t.name}</td>
+                                    <td>${toLocaleDate(t.date)}</td>
+                                </tr>`;
+                }
+            } catch (err) {
+                msg.innerText = err.message || "Помилка";
+                tbody.innerHTML = '<tr><td colspan="2" style="text-align:center;">Помилка завантаження</td></tr>';
+            }
+        }
+        loadTournaments();
+    </script>
+</body>
+</html>

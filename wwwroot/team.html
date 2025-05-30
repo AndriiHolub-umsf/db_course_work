@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <title>Команда</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <div id="header"></div>
+    <div class="container" id="teamPage">
+        <h2>Завантаження...</h2>
+    </div>
+
+    <script src="/js/site.js"></script>
+    <script>
+        function getId() {
+            const params = new URLSearchParams(window.location.search);
+            return params.get('id');
+        }
+
+        let isCaptain = false;
+
+
+        async function loadTeam() {
+            const id = getId();
+            if (!id) return;
+            const container = document.getElementById('teamPage');
+            container.innerHTML = '<h2>Завантаження...</h2>';
+
+            try {
+  
+
+    
+                const res2 = await fetch(`/api/team/${id}/is-captain`, {
+                    headers: { "Authorization": "Bearer " + localStorage.getItem("jwtToken") }
+                });
+                isCaptain = false;
+                if (res2.ok) {
+                    const teamData = await res2.json();
+                    isCaptain = !!teamData.isCaptain;
+
+                }
+
+   
+                const res = await fetch(`/api/team/details/${id}`);
+                if (!res.ok) throw new Error("Помилка завантаження");
+                const t = await res.json();
+
+                let teamPhoto = t.photoBase64
+                    ? `<img class="team-photo-avatar" src="data:image/jpeg;base64,${t.photoBase64}" alt="Фото команди" style="margin-bottom:12px;">`
+                    : `<span style="color:#666">Немає фото</span>`;
+
+                // Рисуем игроков с кнопкой "Удалить"
+                let players = (t.players && t.players.length)
+                    ? t.players.map(p => {
+                        let removeBtn = '';
+                        if (isCaptain && p.pid !== t.capitan_id) {
+                            removeBtn = `<button class="remove-player-btn" data-player-id="${p.pid}" style="margin-left:14px;color:#fff;background:#e74c3c;border:none;padding:5px 10px;border-radius:5px;cursor:pointer;">Видалити</button>`;
+                        }
+                        let captainMark = (p.pid === t.capitan_id)
+							? ' <span style="color:#2ecc40;font-weight:bold;">(Капітан)</span>'
+							: '';
+						return `<div class="team-player-row" style="display:flex;align-items:center;margin-bottom:8px;">
+							<img class="avatar-preview" src="data:image/jpeg;base64,${p.photoBase64}" alt="Фото" style="margin-right:10px;">
+							<span>${p.pname ?? '-'}${captainMark}</span>
+							${removeBtn}
+							</div>`;
+                    }).join('')
+                    : '<div>Нема гравців</div>';
+
+                let tournaments = (t.tournaments && t.tournaments.length)
+                    ? t.tournaments.map(tr => `<li>${tr.name} (${toLocaleDate(tr.date)?? '-'})</li>`).join('')
+                    : '<li>Нема турнірів</li>';
+
+                let addPlayerHtml = '';
+                if (isCaptain) {
+                    addPlayerHtml = `
+                        <div id="addPlayerContainer" style="margin-top:28px;">
+                            <h3>Додати гравця:</h3>
+                            <input type="email" id="addPlayerEmail" placeholder="Email гравця" required style="padding:6px;">
+                            <button id="addPlayerBtn" style="padding:7px 14px;">Додати</button>
+                            <span id="addPlayerMsg" style="margin-left:10px;color:#2ecc40;"></span>
+                        </div>
+                    `;
+                }
+
+                container.innerHTML = `
+                    <h2>${t.tname}</h2>
+                    ${teamPhoto}
+                    <h3>Гравці</h3>
+                    <div id="playersList">${players}</div>
+                    ${addPlayerHtml}
+                    <h3>Турніри</h3>
+                    <ul>${tournaments}</ul>
+                `;
+
+    
+                if (isCaptain) {
+                    document.querySelectorAll('.remove-player-btn').forEach(btn => {
+                        btn.onclick = async function () {
+                            const playerId = this.dataset.playerId;
+                            if (!playerId) return;
+                            if (!confirm('Видалити гравця з команди?')) return;
+
+                            this.disabled = true;
+                            try {
+                                const res = await fetch(`/api/team/${id}/remove_player`, {
+                                    method: "POST",
+                                    headers: {
+                                        "Content-Type": "application/json",
+                                        "Authorization": "Bearer " + localStorage.getItem("jwtToken")
+                                    },
+                                    body: JSON.stringify({ playerId: parseInt(playerId) })
+                                });
+                                const json = await res.json();
+                                if (res.ok) {
+                                    loadTeam();
+                                } else {
+                                    alert(json.message || "Помилка видалення");
+                                }
+                            } catch (e) {
+                                alert("Ошибка сети");
+                            }
+                            this.disabled = false;
+                        };
+                    });
+
+
+                    const addBtn = document.getElementById('addPlayerBtn');
+                    if (addBtn) {
+                        addBtn.onclick = async function () {
+                            const btn = this;
+                            btn.disabled = true;
+                            let msg = document.getElementById('addPlayerMsg');
+                            msg.innerText = '';
+                            msg.style.color = '#2ecc40';
+
+                            const email = document.getElementById('addPlayerEmail').value.trim();
+                            if (!email) {
+                                msg.style.color = "#e74c3c";
+                                msg.innerText = "Введіть email гравця!";
+                                btn.disabled = false;
+                                return;
+                            }
+                            try {
+                                const teamId = getId();
+                                const res = await fetch(`/api/team/${teamId}/add_player`, {
+                                    method: "POST",
+                                    headers: {
+                                        "Content-Type": "application/json",
+                                        "Authorization": "Bearer " + localStorage.getItem("jwtToken")
+                                    },
+                                    body: JSON.stringify({ email })
+                                });
+                                const json = await res.json();
+                                if (res.ok) {
+                                    msg.style.color = "#2ecc40";
+                                    msg.innerText = json.message || "Гравець додано!";
+                                    document.getElementById('addPlayerEmail').value = '';
+                                    setTimeout(loadTeam, 600);
+                                } else {
+                                    msg.style.color = "#e74c3c";
+                                    msg.innerText = json.message || "Помилка додавання";
+                                }
+                            } catch (e) {
+                                msg.style.color = "#e74c3c";
+                                msg.innerText = "Помилка сеті";
+                            }
+                            btn.disabled = false;
+                        };
+                    }
+                }
+
+            } catch (e) {
+                container.innerHTML = `<div style="color:#e74c3c">Помилка: ${e.message}</div>`;
+            }
+        }
+        loadTeam();
+    </script>
+</body>
+</html>
