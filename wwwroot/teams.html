@@ -35,22 +35,17 @@
         async function checkPlayerInTeam() {
             try {
 
-                document.getElementById("createTeamContainer").style.display = "";
-                document.getElementById("createTeamBtn").onclick = function () {
-                    window.location = "/create-team.html";
-                }
-                /*const res = await fetch('/api/player/in_team', {
-                    headers: { "Authorization": "Bearer " + localStorage.getItem("jwtToken") }
-                });
-                if (!res.ok)
-                    return;
-                const { inTeam } = await res.json();
-                if (!inTeam) {
-                    document.getElementById("createTeamContainer").style.display = "";
-                    document.getElementById("createTeamBtn").onclick = function () {
-                        window.location = "/create-team.html";
+                const payload = getJwtPayload();
+                if (payload) {
+
+                    if (payload.role === 'User' || payload['http://schemas.microsoft.com/ws/2008/06/identity/claims/role'] === 'User') {
+                        document.getElementById("createTeamContainer").style.display = "";
+                        document.getElementById("createTeamBtn").onclick = function () {
+                            window.location = "/create-team.html";
+                        }
                     }
-                }*/
+                }
+                
             } catch (e) {
 
             }
